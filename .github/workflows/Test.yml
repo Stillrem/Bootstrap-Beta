@@ -93,6 +93,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
+      - name: Get bootstrap artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: Bootstrap.tipa
+
       - name: Create new release
         uses: ncipollo/release-action@v1
         with:
