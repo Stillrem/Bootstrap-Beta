@@ -23,11 +23,11 @@ jobs:
         run: |
           git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
           git config --global user.name "${GITHUB_ACTOR}"
-          git remote add upstream https://github.com/RootHide/Bootstrap
-          git fetch upstream
+          git remote set-url origin https://github.com/RootHide/Bootstrap
+          git fetch origin
           git fetch --all --prune
-          git pull --rebase --strategy-option=theirs upstream main
-          CHANGE_COUNT=$(git rev-list HEAD...upstream/main --count)
+          git pull --rebase --strategy-option=theirs origin main
+          CHANGE_COUNT=$(git rev-list HEAD...origin/main --count)
           if [ "$CHANGE_COUNT" -gt 0 ]; then
             echo "New changes detected"
             echo "changes_detected=true" >> $GITHUB_ENV
