@@ -76,7 +76,7 @@ jobs:
           echo "New version is ${new_tag}"
 
       - name: Make bootstrap package
-        run: make -j$(sysctl -n hw.ncpu) package
+        run: gmake -j$(sysctl -n hw.ncpu) package
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3
