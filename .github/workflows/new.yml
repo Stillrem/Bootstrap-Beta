@@ -18,20 +18,24 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const axios = require('axios');
+            const { getOctokit, context } = require('@actions/github');
             const fs = require('fs');
             const path = require('path');
 
+            const octokit = getOctokit(process.env.GITHUB_TOKEN);
             const upstreamRepo = 'roothide/Bootstrap';
-            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
+            const [owner, repo] = upstreamRepo.split('/');
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
             async function getLatestRelease() {
               try {
-                const response = await axios.get(apiURL);
+                const response = await octokit.repos.getLatestRelease({
+                  owner,
+                  repo
+                });
                 return response.data.tag_name;
               } catch (error) {
-                core.setFailed(`Unable to get latest release: ${error}`);
+                console.error(`Unable to get latest release: ${error}`);
                 return null;
               }
             }
@@ -47,10 +51,10 @@ jobs:
 
               if (latestRelease !== previousRelease) {
                 fs.writeFileSync(releaseFilePath, latestRelease, 'utf8');
-                core.info(`New release found: ${latestRelease}`);
+                console.log(`New release found: ${latestRelease}`);
 
-                // Continue the rest of your script here
-                // For example, creating an issue using the GitHub API...
+                // Here you would continue your code for handling a new release.
+                // For example, opening an issue using the octokit.rest.issues.create method
               }
             }
 
