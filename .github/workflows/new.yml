@@ -3,7 +3,7 @@ name: Upstream Release Notifier
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '0 * * * *'
 
 jobs:
   check-upstream-release:
@@ -12,38 +12,39 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Check for new release
+      - name: Set axios
+        run: npm install axios
+
+      - name: Check for a new release
         id: check-release
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            const { getOctokit, context } = require('@actions/github');
+            const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
+            const core = require('@actions/core');
 
-            const octokit = getOctokit(process.env.GITHUB_TOKEN);
             const upstreamRepo = 'roothide/Bootstrap';
-            const [owner, repo] = upstreamRepo.split('/');
+            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
             async function getLatestRelease() {
               try {
-                const response = await octokit.repos.getLatestRelease({
-                  owner,
-                  repo
-                });
-                return response.data.tag_name;
+                const response = await axios.get(apiURL);
+                return response.data;
               } catch (error) {
-                console.error(`Unable to get latest release: ${error}`);
+                console.error(`Unable to retrieve latest release data: ${error}`);
                 return null;
               }
             }
 
             async function run() {
-              const latestRelease = await getLatestRelease();
-              if (!latestRelease) return;
+              const latestReleaseData = await getLatestRelease();
+              if (!latestReleaseData) return;
 
+              const latestRelease = latestReleaseData.tag_name;
               let previousRelease = '';
               if (fs.existsSync(releaseFilePath)) {
                 previousRelease = fs.readFileSync(releaseFilePath, 'utf8');
@@ -52,9 +53,12 @@ jobs:
               if (latestRelease !== previousRelease) {
                 fs.writeFileSync(releaseFilePath, latestRelease, 'utf8');
                 console.log(`New release found: ${latestRelease}`);
+                core.setOutput('new-release', latestRelease);
 
-                // Here you would continue your code for handling a new release.
-                // For example, opening an issue using the octokit.rest.issues.create method
+                const modifiedFiles = latestReleaseData.assets.map(asset => asset.name).join(', ');
+                console.log(`Modified files: ${modifiedFiles}`);
+              } else {
+                console.log(`No new release found. Latest is still: ${previousRelease}`);
               }
             }
 
