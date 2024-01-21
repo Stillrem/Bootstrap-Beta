@@ -25,7 +25,6 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const { exec: execChildProcess } = require('child_process');
-            const core = require('@actions/core');
 
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
