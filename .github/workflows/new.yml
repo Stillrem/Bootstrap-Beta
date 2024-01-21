@@ -26,7 +26,7 @@ jobs:
             const path = require('path');
             const { execSync } = require('child_process');
 
-            const upstreamRepo = 'twbs/bootstrap';
+            const upstreamRepo = 'roothide/bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
