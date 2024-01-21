@@ -36,7 +36,7 @@ jobs:
                 const response = await axios.get(apiURL);
                 return response.data.tag_name;
               } catch (error) {
-                console.error(`Unable to get latest release: ${error}`);
+                core.setFailed(`Unable to get latest release: ${error}`);
                 return null;
               }
             }
@@ -52,23 +52,26 @@ jobs:
 
               if (latestRelease !== previousRelease) {
                 fs.writeFileSync(releaseFilePath, latestRelease, 'utf8');
-                console.log(`New release found: ${latestRelease}`);
+                core.info(`New release found: ${latestRelease}`);
 
                 const issueBody = `New release found: ${latestRelease}`;
                 const issueTitle = `New Release: ${latestRelease}`;
 
-                const issue = await github.rest.issues.create({
-                  ...github.context.repo,
+                const octokit = github.getOctokit(core.getInput('github-token'));
+                const context = github.context;
+
+                await octokit.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
                   title: issueTitle,
                   body: issueBody,
                 });
 
-                console.log(`Issue created: #${issue.data.number}`);
-
-                core.setOutput('new-release', latestRelease);
+                core.info(`Issue created for release: ${latestRelease}`);
               } else {
-                console.log(`No new release found. Latest is still: ${previousRelease}`);
+                core.info(`No new release found. Latest known release: ${previousRelease}`);
               }
             }
 
-            await run();
+            // Run the function
+            run();
