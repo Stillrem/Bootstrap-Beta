@@ -25,6 +25,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const { exec: execChildProcess } = require('child_process');
+            const core = require('@actions/core');
 
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
@@ -42,7 +43,6 @@ jobs:
 
             function getChangedFiles(previousTag, currentTag) {
               return new Promise((resolve, reject) => {
-
                 const command = `git diff --name-status ${previousTag}..${currentTag}`;
                 execChildProcess(command, (error, stdout, stderr) => {
                   if (error) {
@@ -51,6 +51,16 @@ jobs:
                   resolve(stdout.trim().split('\n'));
                 });
               });
+            }
+
+            function generateChangeLog(changedFiles) {
+              const tableHeader = `| File | Change Type |\n| --- | --- |`;
+              const tableRows = changedFiles.map(file => {
+                const [type, name] = file.split('\t');
+                return `| ${name} | ${type} |`;
+              }).join('\n');
+
+              return `${tableHeader}\n${tableRows}`;
             }
 
             async function run() {
@@ -68,7 +78,10 @@ jobs:
 
                 if (previousRelease) {
                   const changedFiles = await getChangedFiles(previousRelease, latestRelease);
-                  console.log('Changed files:', changedFiles);
+                  const changeLog = generateChangeLog(changedFiles);
+                  console.log('Change Log:\n', changeLog);
+                  // Дополнительно можно установить changeLog как выходное значение
+                  core.setOutput('change-log', changeLog);
                 }
 
                 core.setOutput('new-release', latestRelease);
