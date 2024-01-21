@@ -24,9 +24,9 @@ jobs:
             const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
-            const { exec: execChildProcess } = require('child_process');
+            const { execSync } = require('child_process');
 
-            const upstreamRepo = 'roothide/Bootstrap';
+            const upstreamRepo = 'twbs/bootstrap'; // Make sure to use the correct repository here
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
@@ -41,24 +41,28 @@ jobs:
             }
 
             function getChangedFiles(previousTag, currentTag) {
-              return new Promise((resolve, reject) => {
-                const command = `git diff --name-status ${previousTag}..${currentTag}`;
-                execChildProcess(command, (error, stdout, stderr) => {
-                  if (error) {
-                    reject(stderr);
-                  }
-                  resolve(stdout.trim().split('\n'));
-                });
+              const command = `git diff --name-status ${previousTag}..${currentTag}`;
+              const output = execSync(command).toString();
+              const changes = output.trim().split('\n').map(line => {
+                const [status, ...paths] = line.split('\t');
+                return { status, path: paths.join('\t') }; // Joining all parts except the first (status)
               });
+              return changes;
             }
 
-            function generateChangeLog(changedFiles) {
+            function generateChangeLog(changes) {
               const tableHeader = `| File | Change Type |\n| --- | --- |`;
-              const tableRows = changedFiles.map(file => {
-                const [type, name] = file.split('\t');
-                return `| ${name} | ${type} |`;
+              const tableRows = changes.map(change => {
+                let changeType;
+                switch (change.status) {
+                  case 'A': changeType = 'Added'; break;
+                  case 'M': changeType = 'Modified'; break;
+                  case 'D': changeType = 'Deleted'; break;
+                  case 'R': changeType = 'Renamed'; break;
+                  default: changeType = 'Unknown'; break;
+                }
+                return `| ${change.path} | ${changeType} |`;
               }).join('\n');
-
               return `${tableHeader}\n${tableRows}`;
             }
 
@@ -76,10 +80,9 @@ jobs:
                 console.log(`Found a new release: ${latestRelease}`);
 
                 if (previousRelease) {
-                  const changedFiles = await getChangedFiles(previousRelease, latestRelease);
-                  const changeLog = generateChangeLog(changedFiles);
+                  const changes = getChangedFiles(previousRelease, latestRelease);
+                  const changeLog = generateChangeLog(changes);
                   console.log('Change Log:\n', changeLog);
-                  // Дополнительно можно установить changeLog как выходное значение
                   core.setOutput('change-log', changeLog);
                 }
 
@@ -90,3 +93,9 @@ jobs:
             }
 
             run();
+
+      - name: Do something with the changelog
+        if: steps.check-release.outputs.change-log
+        run: |
+          echo "Changelog:"
+          echo "${{ steps.check-release.outputs.change-log }}"
