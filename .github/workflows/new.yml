@@ -19,7 +19,7 @@ jobs:
         id: check-release
         uses: actions/github-script@v7
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const axios = require('axios');
             const fs = require('fs');
