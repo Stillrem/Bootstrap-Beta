@@ -24,7 +24,7 @@ jobs:
             const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
-            const { exec } = require('child_process');
+            const { exec: execChildProcess } = require('child_process');
 
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
@@ -42,8 +42,9 @@ jobs:
 
             function getChangedFiles(previousTag, currentTag) {
               return new Promise((resolve, reject) => {
+
                 const command = `git diff --name-status ${previousTag}..${currentTag}`;
-                exec(command, (error, stdout, stderr) => {
+                execChildProcess(command, (error, stdout, stderr) => {
                   if (error) {
                     reject(stderr);
                   }
