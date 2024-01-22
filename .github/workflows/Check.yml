@@ -73,7 +73,7 @@ jobs:
             |---------|-----------|----------------------|---------|------------|---------|-------|----------|
             | ${newRelease} | ${new Date().toISOString().split('T')[0]} | - | - | - | - | - | - |
             `;
-            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).`;
+            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
             const issues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
