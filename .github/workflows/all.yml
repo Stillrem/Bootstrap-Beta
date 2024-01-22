@@ -80,9 +80,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const github = require('@actions/github');
-            const context = github.context;
-
             const issueTitle = `Upstream release update`;
             const newRelease = core.getInput('new-release');
             const publishedDate = core.getInput('published-date');
