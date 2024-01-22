@@ -74,9 +74,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
-            const github = require('@actions/github');
-            
             const issueTitle = `Upstream release update`;
             const newRelease = '${{ steps.check-release.outputs.new-release }}';
             const publishedDate = '${{ steps.check-release.outputs.published-date }}';
