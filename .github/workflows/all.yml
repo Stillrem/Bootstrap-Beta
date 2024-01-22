@@ -1,0 +1,119 @@
+name: Upstream Release Notifier
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  check-upstream-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install axios
+        run: npm install axios
+
+      - name: Check for new release
+        id: check-release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const axios = require('axios');
+            const fs = require('fs');
+            const path = require('path');
+
+            const formatDate = (dateString) => {
+              const date = new Date(dateString);
+              const day = date.getUTCDate().toString().padStart(2, '0');
+              const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+              const year = date.getUTCFullYear();
+              return `${month}.${day}.${year}`;
+            };
+
+            const upstreamRepo = 'roothide/Bootstrap';
+            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
+            const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
+
+            async function getLatestRelease() {
+              try {
+                const response = await axios.get(apiURL);
+                return {
+                  tagName: response.data.tag_name,
+                  publishedDate: response.data.published_at
+                };
+              } catch (error) {
+                console.error(`Unable to get latest release: ${error}`);
+                return null;
+              }
+            }
+
+            async function run() {
+              const latestReleaseData = await getLatestRelease();
+              if (!latestReleaseData) return;
+
+              const { tagName, publishedDate } = latestReleaseData;
+              const formattedDate = formatDate(publishedDate);
+
+              let previousRelease = '';
+              if (fs.existsSync(releaseFilePath)) {
+                previousRelease = fs.readFileSync(releaseFilePath, 'utf8');
+              }
+
+              if (tagName !== previousRelease) {
+                fs.writeFileSync(releaseFilePath, tagName, 'utf8');
+                console.log(`New release found: ${tagName}`);
+                core.setOutput('new-release', tagName);
+                core.setOutput('published-date', formattedDate);
+              } else {
+                console.log(`No new release found. Latest is still: ${previousRelease}`);
+              }
+            }
+
+            await run();
+
+      - name: Notify about new release
+        if: steps.check-release.outputs.new-release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const context = github.context;
+
+            const issueTitle = `Upstream release update`;
+            const newRelease = core.getInput('new-release');
+            const publishedDate = core.getInput('published-date');
+            const generalChangeLog = `
+
+            | Version | Released  | Added                | Changed | Removed | Fixed |
+            |---------|-----------|----------------------|---------|---------|-------|
+            | ${newRelease} | ${publishedDate} | - | - | - | - |
+            `;
+            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'release-update'
+            });
+            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
+            if (existingIssue) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: issueBody
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['release-update']
+              });
+            }
