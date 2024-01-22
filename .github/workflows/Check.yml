@@ -69,8 +69,8 @@ jobs:
             const newRelease = '${{ steps.check-release.outputs.new-release }}';
             const generalChangeLog = `
 
-            | Version | Released  | Added                | Changed | Deprecated | Removed | Fixed | Security |
-            |---------|-----------|----------------------|---------|------------|---------|-------|----------|
+            | Version | Released  | Added                | Changed | Deprecated | Removed | Fixed |
+            |---------|-----------|----------------------|---------|------------|---------|-------|
             | ${newRelease} | ${new Date().toISOString().split('T')[0]} | - | - | - | - | - | - |
             `;
             const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
