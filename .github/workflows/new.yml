@@ -1,4 +1,4 @@
-name: Release Notification
+name: Upstream Release Notifier
 
 on:
   workflow_dispatch:
@@ -9,13 +9,13 @@ jobs:
   check-upstream-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Install axios
         run: npm install axios
 
-      - name: Check for New Release
+      - name: Check for new release
         id: check-release
         uses: actions/github-script@v7
         with:
@@ -24,9 +24,8 @@ jobs:
             const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
-            const { execSync } = require('child_process');
 
-            const upstreamRepo = 'roothide/bootstrap';
+            const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
@@ -35,35 +34,9 @@ jobs:
                 const response = await axios.get(apiURL);
                 return response.data.tag_name;
               } catch (error) {
-                console.error(`Failed to fetch the latest release: ${error}`);
+                console.error(`Unable to get latest release: ${error}`);
                 return null;
               }
-            }
-
-            function getChangedFiles(previousTag, currentTag) {
-              const command = `git diff --name-status ${previousTag}..${currentTag}`;
-              const output = execSync(command).toString();
-              const changes = output.trim().split('\n').map(line => {
-                const [status, ...paths] = line.split('\t');
-                return { status, path: paths.join('\t') }; // Joining all parts except the first (status)
-              });
-              return changes;
-            }
-
-            function generateChangeLog(changes) {
-              const tableHeader = `| File | Change Type |\n| --- | --- |`;
-              const tableRows = changes.map(change => {
-                let changeType;
-                switch (change.status) {
-                  case 'A': changeType = 'Added'; break;
-                  case 'M': changeType = 'Modified'; break;
-                  case 'D': changeType = 'Deleted'; break;
-                  case 'R': changeType = 'Renamed'; break;
-                  default: changeType = 'Unknown'; break;
-                }
-                return `| ${change.path} | ${changeType} |`;
-              }).join('\n');
-              return `${tableHeader}\n${tableRows}`;
             }
 
             async function run() {
@@ -77,25 +50,47 @@ jobs:
 
               if (latestRelease !== previousRelease) {
                 fs.writeFileSync(releaseFilePath, latestRelease, 'utf8');
-                console.log(`Found a new release: ${latestRelease}`);
-
-                if (previousRelease) {
-                  const changes = getChangedFiles(previousRelease, latestRelease);
-                  const changeLog = generateChangeLog(changes);
-                  console.log('Change Log:\n', changeLog);
-                  core.setOutput('change-log', changeLog);
-                }
-
+                console.log(`New release found: ${latestRelease}`);
                 core.setOutput('new-release', latestRelease);
               } else {
-                console.log(`No new releases found. The latest release is still: ${previousRelease}`);
+                console.log(`No new release found. Latest is still: ${previousRelease}`);
               }
             }
 
-            run();
+            await run();
 
-      - name: Do something with the changelog
-        if: steps.check-release.outputs.change-log
-        run: |
-          echo "Changelog:"
-          echo "${{ steps.check-release.outputs.change-log }}"
+      - name: Notify about new release
+        if: steps.check-release.outputs.new-release
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueTitle = `Upstream release update`;
+            const newRelease = '${{ steps.check-release.outputs.new-release }}';
+            const generalChangeLog = `
+
+            | Version | Released  | Added                | Changed | Deprecated | Removed | Fixed | Security |
+            |---------|-----------|----------------------|---------|------------|---------|-------|----------|
+            | ${newRelease} | ${new Date().toISOString().split('T')[0]} | - | - | - | - | - | - |
+            `;
+            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'release-update'
+            });
+            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
+            if (existingIssue) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: issueBody
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+             
