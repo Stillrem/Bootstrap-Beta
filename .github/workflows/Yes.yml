@@ -24,7 +24,6 @@ jobs:
             const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
-            const core = require('@actions/core');
 
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
