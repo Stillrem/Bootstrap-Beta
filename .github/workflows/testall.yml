@@ -58,9 +58,9 @@ jobs:
               if (tagName !== previousRelease) {
                 fs.writeFileSync(releaseFilePath, tagName, 'utf8');
                 console.log(`New release found: ${tagName}`);
-                github.context.outputName = tagName;
-                github.context.outputName = publishedDate;
-                github.context.outputName = fixedItems;
+                core.setOutput('new-release', tagName);
+                core.setOutput('published-date', publishedDate);
+                core.setOutput('fixed-items', fixedItems);
               } else {
                 console.log(`No new release found. Latest is still: ${previousRelease}`);
               }
