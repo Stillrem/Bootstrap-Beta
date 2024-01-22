@@ -14,6 +14,8 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+            const deleteDelay = 500;
             
             console.log(`Deleting all workflow runs for ${owner}/${repo}`);
             
@@ -33,5 +35,6 @@ jobs:
                   repo,
                   run_id: run.id
                 });
+                await delay(deleteDelay);
               }
             }
