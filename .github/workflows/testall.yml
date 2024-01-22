@@ -82,8 +82,8 @@ jobs:
             const formattedDate = `${('0' + (date.getMonth() + 1)).slice(-2)}.${('0' + date.getDate()).slice(-2)}.${date.getFullYear()}`;
             const generalChangeLog = `
 
-            | Version | Released  | Fixed                      |
-            |---------|-----------|----------------------------|
+            | Version | Released  | Fixed                                                              |
+            |---------|-----------|--------------------------------------------------------------------|
             | ${newRelease} | ${formattedDate} | ${fixedItems} |
             `;
             const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
