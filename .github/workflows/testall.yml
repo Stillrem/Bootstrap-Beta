@@ -27,8 +27,8 @@ jobs:
 
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
+            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
-            const markdownTablePath = path.join(process.env.GITHUB_WORKSPACE, 'RELEASES.md');
 
             async function getLatestRelease() {
               try {
@@ -52,7 +52,7 @@ jobs:
                 publishedDate: new Date(latestRelease.publishedDate).toISOString(),
                 fixedItems: latestRelease.fixedItems
               };
-              
+              
               fs.writeFileSync(releaseFilePath, JSON.stringify(releaseData));
 
               console.log(`Latest release tag: ${latestRelease.tagName}`);
@@ -77,7 +77,7 @@ jobs:
             - Release Tag: ${releaseInfos.tagName}
             - Published Date: ${releaseInfos.publishedDate}
             - Fixed Items: ${releaseInfos.fixedItems}`;
-            
+            
             github.issues.cre
             github.rest.issues.create({
               owner: context.repo.owner,
