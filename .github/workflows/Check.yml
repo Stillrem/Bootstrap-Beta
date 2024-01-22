@@ -32,7 +32,10 @@ jobs:
             async function getLatestRelease() {
               try {
                 const response = await axios.get(apiURL);
-                return response.data.tag_name;
+                return {
+                  tagName: response.data.tag_name,
+                  publishedDate: response.data.published_at
+                };
               } catch (error) {
                 console.error(`Unable to get latest release: ${error}`);
                 return null;
@@ -40,18 +43,21 @@ jobs:
             }
 
             async function run() {
-              const latestRelease = await getLatestRelease();
-              if (!latestRelease) return;
+              const latestReleaseData = await getLatestRelease();
+              if (!latestReleaseData) return;
+
+              const { tagName, publishedDate } = latestReleaseData;
 
               let previousRelease = '';
               if (fs.existsSync(releaseFilePath)) {
                 previousRelease = fs.readFileSync(releaseFilePath, 'utf8');
               }
 
-              if (latestRelease !== previousRelease) {
-                fs.writeFileSync(releaseFilePath, latestRelease, 'utf8');
-                console.log(`New release found: ${latestRelease}`);
-                core.setOutput('new-release', latestRelease);
+              if (tagName !== previousRelease) {
+                fs.writeFileSync(releaseFilePath, tagName, 'utf8');
+                console.log(`New release found: ${tagName}`);
+                core.setOutput('new-release', tagName);
+                core.setOutput('published-date', publishedDate);
               } else {
                 console.log(`No new release found. Latest is still: ${previousRelease}`);
               }
@@ -67,11 +73,13 @@ jobs:
           script: |
             const issueTitle = `Upstream release update`;
             const newRelease = '${{ steps.check-release.outputs.new-release }}';
+            const publishedDate = '${{ steps.check-release.outputs.published-date }}';
+            const formattedDate = new Date(publishedDate).toISOString().split('T')[0];
             const generalChangeLog = `
 
             | Version | Released  | Added                | Changed | Removed | Fixed |
             |---------|-----------|----------------------|---------|---------|-------|
-            | ${newRelease} | ${new Date().toISOString().split('T')[0]} | - | - | - | - |
+            | ${newRelease} | ${formattedDate} | - | - | - | - |
             `;
             const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
             const issues = await github.rest.issues.listForRepo({
