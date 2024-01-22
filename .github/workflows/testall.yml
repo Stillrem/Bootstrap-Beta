@@ -28,6 +28,7 @@ jobs:
             const upstreamRepo = 'roothide/Bootstrap';
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
+            const markdownTablePath = path.join(process.env.GITHUB_WORKSPACE, 'RELEASES.md');
 
             async function getLatestRelease() {
               try {
@@ -35,13 +36,26 @@ jobs:
                 const fixedItems = response.data.body.match(/(?<=\bFixed\b\s*.*?)(\d+.*?)(?=\n|$)/gi) || [];
                 return {
                   tagName: response.data.tag_name,
-                  publishedDate: response.data.published_at, 
+                  publishedDate: response.data.published_at,
                   fixedItems: fixedItems.join(', ')
                 };
               } catch (error) {
                 console.error(`Unable to get latest release: ${error}`);
                 return null;
               }
+            }
+
+            function generateMarkdownTableRow(data) {
+              return `| ${data.tagName} | ${data.publishedDate} | ${data.fixedItems} |`;
+            }
+
+            function updateMarkdownTable(filePath, newDataRow) {
+              let tableContent = '';
+              if (fs.existsSync(filePath)) {
+                tableContent = fs.readFileSync(filePath, 'utf8');
+              }
+              tableContent += `\n${newDataRow}`;
+              fs.writeFileSync(filePath, tableContent);
             }
 
             async function run() {
@@ -56,57 +70,15 @@ jobs:
               }
 
               if (tagName !== previousRelease) {
-                fs.writeFileSync(releaseFilePath, tagName, 'utf8');
-                console.log(`New release found: ${tagName}`);
-                core.setOutput('new-release', tagName);
-                core.setOutput('published-date', publishedDate);
-                core.setOutput('fixed-items', fixedItems);
-              } else {
-                console.log(`No new release found. Latest is still: ${previousRelease}`);
+                const newTableRow = generateMarkdownTableRow({
+                  tagName: tagName,
+                  publishedDate: publishedDate,
+                  fixedItems: fixedItems
+                });
+
+                updateMarkdownTable(markdownTablePath, newTableRow);
+                fs.writeFileSync(releaseFilePath, tagName);
               }
+
             }
-
-            await run();
-
-      - name: Notify about new release
-        if: steps.check-release.outputs.new-release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issueTitle = `Upstream release update`;
-            const newRelease = '${{ steps.check-release.outputs.new-release }}';
-            const publishedDate = '${{ steps.check-release.outputs.published-date }}';
-            const fixedItems = '${{ steps.check-release.outputs.fixed-items }}';
-            const date = new Date(publishedDate);
-            const formattedDate = `${('0' + (date.getMonth() + 1)).slice(-2)}.${('0' + date.getDate()).slice(-2)}.${date.getFullYear()}`;
-            const generalChangeLog = `
-
-            | Version | Released  | Fixed                                                              |
-            |---------|-----------|--------------------------------------------------------------------|
-            | ${newRelease} | ${formattedDate} | ${fixedItems} |
-            `;
-            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'release-update'
-            });
-            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
-            if (existingIssue) {
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existingIssue.number,
-                body: issueBody
-              });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: issueTitle,
-                body: issueBody,
-                labels: ['release-update']
-              });
-            }
+            run();
