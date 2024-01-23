@@ -113,13 +113,13 @@ jobs:
       - name: Get bootstrap artifact
         uses: actions/download-artifact@v3
         with:
-          name: Bootstrap-${{ env.VERSION }}-${{ env.RELEASE_DATE }}.tipa
+          name: Bootstrap.tipa
 
       - name: Create new release
         uses: ncipollo/release-action@v1
         with:
           name: Bootstrap_public ${{ env.VERSION }} Release
           body: ${{ env.release_notes }}
-          artifacts: "Bootstrap-${{ env.VERSION }}-${{ env.RELEASE_DATE }}.tipa"
+          artifacts: "Bootstrap.tipa"
           tag: ${{ env.VERSION }}-${{ env.RELEASE_DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
