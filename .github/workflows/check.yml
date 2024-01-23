@@ -120,6 +120,6 @@ jobs:
         with:
           name: Bootstrap_public ${{ env.VERSION }} Release
           body: ${{ env.release_notes }}
-          artifacts: "Bootstrap-${{ env.VERSION }}-${{ env.RELEASE_DATE }}.tipa"
+          artifacts: "Bootstrap.tipa"
           tag: ${{ env.VERSION }}-${{ env.RELEASE_DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
