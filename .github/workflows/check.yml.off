@@ -1,107 +1,120 @@
-name: Upstream Release Notifier
+name: Build and Package
 
 on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: "0 12 * * *"
 
 jobs:
-  check-upstream-release:
-    runs-on: ubuntu-latest
+  check-for-changes:
+    runs-on: macos-latest
+    outputs:
+      changes_detected: ${{ steps.check_changes.outputs.changes_detected }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install axios
-        run: npm install axios
+      - name: Set up Git
+        id: check_changes
+        run: |
+          git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git config --global user.name "${GITHUB_ACTOR}"
+          git remote add upstream https://github.com/RootHide/Bootstrap
+          git fetch upstream
+          git fetch --all --prune
+          git pull --rebase --strategy-option=theirs upstream main
+          CHANGE_COUNT=$(git rev-list HEAD...upstream/main --count)
+          if [ "$CHANGE_COUNT" -gt 0 ]; then
+            echo "New changes detected"
+            echo "changes_detected=true" >> $GITHUB_ENV
+            echo "changes_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes since last build"
+            echo "changes_detected=false" >> $GITHUB_ENV
+            echo "changes_detected=false" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Check for new release
-        id: check-release
-        uses: actions/github-script@v7
+  build:
+    name: Build RootHide Bootstrap
+    runs-on: macos-latest
+    needs: check-for-changes
+    if: ${{ needs.check-for-changes.outputs.changes_detected == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Homebrew
+        run: bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh')"
+
+      - name: Install Theos
+        run: bash -c "$(curl -fsSL 'https://raw.githubusercontent.com/roothide/theos/master/bin/install-theos')"
+
+      - name: Install make
+        run: brew install make
+
+      - name: Setup Theos environment
+        run: echo "THEOS=~/theos" >> $GITHUB_ENV
+
+      - name: Set Version from Upstream
+        run: |
+          git remote add upstream https://github.com/RootHide/Bootstrap || true
+          git fetch upstream --tags
+          latest_upstream_tag=$(git tag --sort=-v:refname --merged upstream/main | head -n 1)
+          echo "Latest upstream tag is $latest_upstream_tag"
+          if [[ $latest_upstream_tag =~ ^v?([0-9]+)\.([0-9]+)(\.([0-9]+))? ]]; then
+            new_tag="${latest_upstream_tag#v}"
+            echo "Current version is set to: $new_tag"
+          else
+            echo "Failed to parse version tag: $latest_upstream_tag"
+            exit 1
+          fi
+          echo "VERSION=${new_tag}" >> $GITHUB_ENV
+          echo "new_tag=${new_tag}" >> $GITHUB_ENV
+
+    - name: Get release notes from upstream GitHub Release
+      id: get_release_notes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        latest_upstream_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+        echo "Latest upstream tag is $latest_upstream_tag"
+        release_data=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/RootHide/Bootstrap/releases/tags/$latest_upstream_tag")
+        release_body=$(echo "$release_data" | jq -r .body)
+        echo "Release notes:" $release_body
+        echo "release_notes=${release_body}" >> $GITHUB_ENV
+
+      - name: Make bootstrap package
+        run: gmake -j$(sysctl -n hw.ncpu) package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const axios = require('axios');
-            const fs = require('fs');
-            const path = require('path');
+          name: Bootstrap.tipa
+          path: ./packages/Bootstrap.tipa
 
-            const upstreamRepo = 'roothide/Bootstrap';
-            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
-            const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
-
-            async function getLatestRelease() {
-              try {
-                const response = await axios.get(apiURL);
-                return {
-                  tagName: response.data.tag_name,
-                  publishedDate: response.data.published_at
-                };
-              } catch (error) {
-                console.error(`Unable to get latest release: ${error}`);
-                return null;
-              }
-            }
-
-            async function run() {
-              const latestReleaseData = await getLatestRelease();
-              if (!latestReleaseData) return;
-
-              const { tagName, publishedDate } = latestReleaseData;
-
-              let previousRelease = '';
-              if (fs.existsSync(releaseFilePath)) {
-                previousRelease = fs.readFileSync(releaseFilePath, 'utf8');
-              }
-
-              if (tagName !== previousRelease) {
-                fs.writeFileSync(releaseFilePath, tagName, 'utf8');
-                console.log(`New release found: ${tagName}`);
-                core.setOutput('new-release', tagName);
-                core.setOutput('published-date', publishedDate);
-              } else {
-                console.log(`No new release found. Latest is still: ${previousRelease}`);
-              }
-            }
-
-            await run();
-
-      - name: Notify about new release
-        if: steps.check-release.outputs.new-release
-        uses: actions/github-script@v7
+      - name: Delete old release
+        uses: dev-drprasad/delete-tag-and-release@v0.2.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issueTitle = `Upstream release update`;
-            const newRelease = '${{ steps.check-release.outputs.new-release }}';
-            const publishedDate = '${{ steps.check-release.outputs.published-date }}';
-            const formattedDate = new Date(publishedDate).toISOString().split('T')[0];
-            const generalChangeLog = `
+          delete_release: true
+          tag_name: ${{ env.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
-            | Version | Released  | Added                | Changed | Removed | Fixed |
-            |---------|-----------|----------------------|---------|---------|-------|
-            | ${newRelease} | ${formattedDate} | - | - | - | - |
-            `;
-            const issueBody = `There's a new release upstream: [${newRelease}](https://github.com/roothide/Bootstrap/releases/tag/${newRelease}).\n\n${generalChangeLog}`;
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'release-update'
-            });
-            const existingIssue = issues.data.find(issue => issue.title === issueTitle);
-            if (existingIssue) {
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existingIssue.number,
-                body: issueBody
-              });
-            } else {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: issueTitle,
-                body: issueBody,
-                labels: ['release-update']
-              });
-            }
+      - name: Get bootstrap artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: Bootstrap.tipa
+
+    - name: Create new release
+      uses: ncipollo/release-action@v1
+      with:
+        name: Bootstrap_public ${{ env.VERSION }} Release
+        body: ${{ env.release_notes }}
+        artifacts: "Bootstrap.tipa"
+        tag: ${{ env.VERSION }}
+        token: ${{ secrets.GITHUB_TOKEN }}
