@@ -74,7 +74,7 @@ jobs:
           fi
           echo "VERSION=${new_tag}" >> $GITHUB_ENV
           echo "new_tag=${new_tag}" >> $GITHUB_ENV
-
+          
       - name: Get release notes from upstream GitHub Release
         id: get_release_notes
         env:
@@ -83,9 +83,11 @@ jobs:
           latest_upstream_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
           echo "Latest upstream tag is $latest_upstream_tag"
           release_data=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/RootHide/Bootstrap/releases/tags/$latest_upstream_tag")
-          release_body=$(echo "$release_data" | jq -r .body)
+          release_body=$(echo "$release_data" | jq -r .body | sed ':a;N;$!ba;s/\r//g;s/\n/\\n/g')
           echo "Release notes:" $release_body
-          echo "release_notes=${release_body}" >> $GITHUB_ENV
+          echo "release_notes<<EOF" >> $GITHUB_ENV
+          echo "$release_body" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Make bootstrap package
         run: gmake -j$(sysctl -n hw.ncpu) package
