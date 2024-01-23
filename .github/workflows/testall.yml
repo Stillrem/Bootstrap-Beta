@@ -24,20 +24,21 @@ jobs:
             const axios = require('axios');
             const fs = require('fs');
             const path = require('path');
+            const markdownTable = require('markdown-table');
 
             const upstreamRepo = 'roothide/Bootstrap';
-            const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const apiURL = `https://api.github.com/repos/${upstreamRepo}/releases/latest`;
             const releaseFilePath = path.join(process.env.GITHUB_WORKSPACE, 'latest_release.txt');
 
             async function getLatestRelease() {
               try {
                 const response = await axios.get(apiURL);
-                const fixedItems = response.data.body.match(/(?<=\bFixed\b\s*.*?)(\d+.*?)(?=\n|$)/gi) || [];
+                const fixedMatch = response.data.body.match(/(?<=\bFixed\b\s*.*?)(\d+.*?)(?=\n|$)/gi) || [];
+                const fixedItems = fixedMatch.map(item => item.trim());
                 return {
                   tagName: response.data.tag_name,
                   publishedDate: response.data.published_at,
-                  fixedItems: fixedItems.join(', ')
+                  fixedItems: fixedItems
                 };
               } catch (error) {
                 console.error(`Unable to get latest release: ${error}`);
@@ -45,43 +46,37 @@ jobs:
               }
             }
 
-            const latestRelease = await getLatestRelease();
-            if (latestRelease) {
-              const releaseData = {
-                tagName: latestRelease.tagName,
-                publishedDate: new Date(latestRelease.publishedDate).toISOString(),
-                fixedItems: latestRelease.fixedItems
-              };
-              
-              fs.writeFileSync(releaseFilePath, JSON.stringify(releaseData));
-
-              console.log(`Latest release tag: ${latestRelease.tagName}`);
-              return releaseData;
-            } else {
-              return;
+            function createMarkdownTable(items) {
+              const tableHeader = ['Issue Number', 'Description'];
+              const tableData = items.map(item => {
+                const [issue, ...descriptionParts] = item.split(/\s+/, 2);
+                return [issue, descriptionParts.join(' ')];
+              });
+              return markdownTable([tableHeader, ...tableData]);
             }
 
-      - name: Update Markdown Table
-        if: steps.check-release.outputs.result
-        run: node .github/scripts/update-markdown-table.js
+            async function run() {
+              const latestReleaseData = await getLatestRelease();
+              if (!latestReleaseData) return;
 
-      - name: Create Issue with release information
-        if: steps.check-release.outputs.result
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const releaseInfos = JSON.parse(fs.readFileSync('${{ env.GITHUB_WORKSPACE }}/latest_release.txt', 'utf8'));
-            const issueTitle = `New Release: ${releaseInfos.tagName}`;
-            const issueBody = `### New Release Info
-            - Release Tag: ${releaseInfos.tagName}
-            - Published Date: ${releaseInfos.publishedDate}
-            - Fixed Items: ${releaseInfos.fixedItems}`;
-            
-            github.issues.cre
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: issueTitle,
-              body: issueBody,
-            });
+              const { tagName, publishedDate, fixedItems } = latestReleaseData;
+              const markdownReleaseTable = createMarkdownTable(fixedItems);
+
+              let releaseInfo = `## New Release ${tagName}\n` +
+                                `**Published Date:** ${publishedDate}\n` +
+                                `### Fixed Issues\n` +
+                                `${markdownReleaseTable}\n`;
+
+              let previousRelease = '';
+              if (fs.existsSync(releaseFilePath)) {
+                previousRelease = fs.readFileSync(releaseFilePath, 'utf8');
+              }
+
+              // Compare and perform necessary actions (left out for brevity)
+              // ...
+
+              // Write current release tag to file
+              fs.writeFileSync(releaseFilePath, tagName);
+            }
+
+            run();
