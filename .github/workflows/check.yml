@@ -59,21 +59,21 @@ jobs:
       - name: Setup Theos environment
         run: echo "THEOS=~/theos" >> $GITHUB_ENV
 
-     # - name: Set Version from Upstream
-        #run: |
-          #git remote add upstream https://github.com/RootHide/Bootstrap || true
-          #git fetch upstream --tags
-          #latest_upstream_tag=$(git tag --sort=-v:refname --merged upstream/main | head -n 1)
-          #echo "Latest upstream tag is $latest_upstream_tag"
-          #if [[ $latest_upstream_tag =~ ^v?([0-9]+)\.([0-9]+)(\.([0-9]+))? ]]; then
-            #new_tag="${latest_upstream_tag#v}"
-            #echo "Current version is set to: $new_tag"
-          #else
-            #echo "Failed to parse version tag: $latest_upstream_tag"
-            #exit 1
-          #fi
-          #echo "VERSION=${new_tag}" >> $GITHUB_ENV
-          #echo "new_tag=${new_tag}" >> $GITHUB_ENV
+      - name: Set Version from Upstream
+        run: |
+          git remote add upstream https://github.com/RootHide/Bootstrap || true
+          git fetch upstream --tags
+          latest_upstream_tag=$(git tag --sort=-v:refname --merged upstream/main | head -n 1)
+          echo "Latest upstream tag is $latest_upstream_tag"
+          if [[ $latest_upstream_tag =~ ^v?([0-9]+)\.([0-9]+)(\.([0-9]+))? ]]; then
+            new_tag="${latest_upstream_tag#v}"
+            echo "Current version is set to: $new_tag"
+          else
+            echo "Failed to parse version tag: $latest_upstream_tag"
+            exit 1
+          fi
+          echo "VERSION=${new_tag}" >> $GITHUB_ENV
+          echo "new_tag=${new_tag}" >> $GITHUB_ENV
           
       - name: Get release notes from upstream GitHub Release
         id: get_release_notes
