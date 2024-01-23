@@ -75,17 +75,17 @@ jobs:
           echo "VERSION=${new_tag}" >> $GITHUB_ENV
           echo "new_tag=${new_tag}" >> $GITHUB_ENV
 
-    - name: Get release notes from upstream GitHub Release
-      id: get_release_notes
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        latest_upstream_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-        echo "Latest upstream tag is $latest_upstream_tag"
-        release_data=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/RootHide/Bootstrap/releases/tags/$latest_upstream_tag")
-        release_body=$(echo "$release_data" | jq -r .body)
-        echo "Release notes:" $release_body
-        echo "release_notes=${release_body}" >> $GITHUB_ENV
+      - name: Get release notes from upstream GitHub Release
+        id: get_release_notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          latest_upstream_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "Latest upstream tag is $latest_upstream_tag"
+          release_data=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/RootHide/Bootstrap/releases/tags/$latest_upstream_tag")
+          release_body=$(echo "$release_data" | jq -r .body)
+          echo "Release notes:" $release_body
+          echo "release_notes=${release_body}" >> $GITHUB_ENV
 
       - name: Make bootstrap package
         run: gmake -j$(sysctl -n hw.ncpu) package
@@ -110,11 +110,11 @@ jobs:
         with:
           name: Bootstrap.tipa
 
-    - name: Create new release
-      uses: ncipollo/release-action@v1
-      with:
-        name: Bootstrap_public ${{ env.VERSION }} Release
-        body: ${{ env.release_notes }}
-        artifacts: "Bootstrap.tipa"
-        tag: ${{ env.VERSION }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create new release
+        uses: ncipollo/release-action@v1
+        with:
+          name: Bootstrap_public ${{ env.VERSION }} Release
+          body: ${{ env.release_notes }}
+          artifacts: "Bootstrap.tipa"
+          tag: ${{ env.VERSION }}
+          token: ${{ secrets.GITHUB_TOKEN }}
