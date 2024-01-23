@@ -67,12 +67,15 @@ jobs:
           echo "Latest upstream tag is $latest_upstream_tag"
           if [[ $latest_upstream_tag =~ ^v?([0-9]+)\.([0-9]+)(\.([0-9]+))? ]]; then
             new_tag="${latest_upstream_tag#v}"
+            release_date=$(git log -1 --format=%ad --date=format:%m.%d.%Y $latest_upstream_tag)
             echo "Current version is set to: $new_tag"
+            echo "Release date is: $release_date"
           else
             echo "Failed to parse version tag: $latest_upstream_tag"
             exit 1
           fi
           echo "VERSION=${new_tag}" >> $GITHUB_ENV
+          echo "RELEASE_DATE=${release_date}" >> $GITHUB_ENV
           echo "new_tag=${new_tag}" >> $GITHUB_ENV
           
       - name: Get release notes from upstream GitHub Release
@@ -118,5 +121,5 @@ jobs:
           name: Bootstrap_public ${{ env.VERSION }} Release
           body: ${{ env.release_notes }}
           artifacts: "Bootstrap.tipa"
-          tag: ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}-${{ env.RELEASE_DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
