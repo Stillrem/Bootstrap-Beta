@@ -3,7 +3,7 @@ name: Upstream Release Notifier
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 12 * * *'
 
 jobs:
   check-upstream-release:
