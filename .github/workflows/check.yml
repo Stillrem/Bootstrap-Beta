@@ -5,9 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch:
-  schedule:
-    - cron: "0 12 * * *"
+  repository_dispatch:
+    types: [check-upstream-release-event]
 
 jobs:
   check-for-changes:
